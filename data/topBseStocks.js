@@ -1,0 +1,60 @@
+import bseStocks from "./bseStocks.js";
+
+const TOP_CODES = [
+  "RELIANCE",
+  "TCS",
+  "HDFCBANK",
+  "ICICIBANK",
+  "SBIN",
+  "INFY",
+  "BHARTIARTL",
+  "LT",
+  "HINDUNILVR",
+  "ITC",
+  "BAJFINANCE",
+  "BAJAJFINSV",
+  "KOTAKBANK",
+  "AXISBANK",
+  "ASIANPAINT",
+  "MARUTI",
+  "SUNPHARMA",
+  "TITAN",
+  "ULTRACEMCO",
+  "NESTLEIND",
+  "POWERGRID",
+  "NTPC",
+  "ONGC",
+  "ADANIENT",
+  "ADANIPORTS",
+  "COALINDIA",
+  "TATAMOTORS",
+  "TATASTEEL",
+  "M&M",
+  "WIPRO",
+  "TECHM",
+  "HCLTECH",
+  "INDUSINDBK",
+  "HDFCLIFE",
+  "SBILIFE",
+  "BAJAJHLDNG",
+  "DLF",
+  "GRASIM",
+  "JSWSTEEL",
+  "HINDALCO",
+  "EICHERMOT",
+  "CIPLA",
+  "DRREDDY",
+  "DIVISLAB",
+  "BRITANNIA",
+  "HEROMOTOCO",
+  "BPCL",
+  "SHRIRAMFIN",
+  "PIDILITIND",
+  "APOLLOHOSP"
+];
+
+const topBseStocks = bseStocks.filter(stock =>
+  TOP_CODES.includes(stock.code)
+);
+
+export default topBseStocks;
