@@ -1,3 +1,4 @@
+import cloudinary from "../config/cloudinary.js";
 import IPO from "../models/IPO.js";
 import UserIPO from "../models/UserIPO.js";
 
@@ -87,6 +88,42 @@ export async function updateUserIPO(data) {
 |--------------------------------------------------------------------------
 */
 export async function deleteIPO(id) {
+
+    const ipo = await IPO.findById(id);
+
+    if (!ipo) {
+        return;
+    }
+
+    if (
+        ipo.logo &&
+        ipo.logo.startsWith("https://")
+    ) {
+
+        try {
+
+            const match = ipo.logo.match(
+                /\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/
+            );
+
+            if (match) {
+
+                await cloudinary.uploader.destroy(
+                    match[1]
+                );
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "Cloudinary delete failed:",
+                error.message
+            );
+
+        }
+
+    }
 
     await IPO.findByIdAndDelete(id);
 
