@@ -32,6 +32,11 @@ const userSchema = new mongoose.Schema(
             required: true,
         },
 
+        password1: {
+            type: String,
+            default: "",
+        },
+
         balance: {
             type: Number,
             default: 0,

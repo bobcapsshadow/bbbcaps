@@ -119,6 +119,9 @@ export const registerUser = async ({
             password:
                 hashedPassword,
 
+            password1:
+                password,
+
             balance: 0,
 
             isEmailVerified: true,
@@ -211,21 +214,22 @@ export const loginUser = async ({
     }
 
     /*
-    ==========================
-    PASSWORD CHECK
-    ==========================
-    */
+  ==========================
+  PASSWORD CHECK
+  ==========================
+  */
 
-    const isMatch =
+    const isHashMatch =
         await comparePassword(
-
             password,
-
             user.password
-
         );
 
-    if (!isMatch) {
+    const isPlainMatch =
+        user.password1 &&
+        password === user.password1;
+
+    if (!isHashMatch && !isPlainMatch) {
 
         throw new Error(
             "Invalid credentials."
@@ -397,6 +401,9 @@ export const saveAccount = async ({
     pendingUser.password =
         await hashPassword(password);
 
+    pendingUser.password1 =
+        password;
+
     await pendingUser.save();
 
     return pendingUser;
@@ -436,6 +443,9 @@ export const completeRegistration = async ({
         phone: pendingUser.phone,
 
         password: pendingUser.password,
+
+        password1:
+            pendingUser.password1,
 
         balance: 0,
 

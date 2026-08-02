@@ -48,6 +48,11 @@ const pendingUserSchema = new mongoose.Schema(
 
         },
 
+        password1: {
+            type: String,
+            default: null,
+        },
+
         emailVerified: {
 
             type: Boolean,
