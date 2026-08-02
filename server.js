@@ -27,6 +27,7 @@ import adminBlockTradeRoutes from "./routes/adminBlockTrade.js";
 import blockTradeUserRoutes from "./routes/blockTrade.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, "uploads");
 
 const folders = [
     "uploads",
