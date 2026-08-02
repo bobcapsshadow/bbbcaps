@@ -1,41 +1,9 @@
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 import crypto from "crypto";
-import { fileURLToPath } from "url";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
-// =====================================================
-// Resolve Current Directory
-// =====================================================
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// =====================================================
-// Upload Directories
-// =====================================================
-
-const uploadRoot = path.join(__dirname, "../uploads");
-
-const aadhaarDir = path.join(uploadRoot, "aadhaar");
-const panDir = path.join(uploadRoot, "pan");
-const ipoDir = path.join(uploadRoot, "ipo");
-const blockTradeDir = path.join(
-    uploadRoot,
-    "blocktrade"
-);
-
-// =====================================================
-// Create Upload Folders Automatically
-// =====================================================
-
-[aadhaarDir, panDir, ipoDir, blockTradeDir,].forEach((dir) => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, {
-            recursive: true,
-        });
-    }
-});
+import cloudinary from "../config/cloudinary.js";
 
 // =====================================================
 // Allowed File Types
@@ -61,11 +29,15 @@ const allowedExtensions = [
 
 const fileFilter = (req, file, cb) => {
 
-    const extension = path.extname(file.originalname).toLowerCase();
+    const extension = path
+        .extname(file.originalname)
+        .toLowerCase();
 
-    const validMime = allowedMimeTypes.includes(file.mimetype);
+    const validMime =
+        allowedMimeTypes.includes(file.mimetype);
 
-    const validExtension = allowedExtensions.includes(extension);
+    const validExtension =
+        allowedExtensions.includes(extension);
 
     if (!validMime || !validExtension) {
 
@@ -83,47 +55,58 @@ const fileFilter = (req, file, cb) => {
 };
 
 // =====================================================
-// Storage
+// Cloudinary Storage
 // =====================================================
 
-const storage = multer.diskStorage({
+const storage = new CloudinaryStorage({
 
-    destination: (req, file, cb) => {
+    cloudinary,
+
+    params: async (req, file) => {
+
+        let folder = "bobstock/misc";
 
         switch (file.fieldname) {
 
             case "aadhaarFront":
 
             case "aadhaarBack":
-                cb(null, aadhaarDir);
+                folder = "bobstock/kyc/aadhaar";
                 break;
 
             case "panImage":
-                cb(null, panDir);
+                folder = "bobstock/kyc/pan";
                 break;
 
             case "logo":
-                cb(null, ipoDir);
+                folder = "bobstock/ipo";
                 break;
 
             case "blockTradeLogo":
-                cb(null, blockTradeDir);
+                folder = "bobstock/blocktrade";
                 break;
 
             default:
-                cb(new Error("Invalid upload field."));
+                folder = "bobstock/misc";
+
         }
 
-    },
+        return {
 
-    filename: (req, file, cb) => {
+            folder,
 
-        const extension = path.extname(file.originalname);
+            public_id:
+                `${Date.now()}-${crypto.randomBytes(12).toString("hex")}`,
 
-        const uniqueName =
-            `${Date.now()}-${crypto.randomBytes(12).toString("hex")}${extension}`;
+            resource_type: "image",
 
-        cb(null, uniqueName);
+            use_filename: false,
+
+            unique_filename: false,
+
+            overwrite: false,
+
+        };
 
     },
 
@@ -133,43 +116,77 @@ const storage = multer.diskStorage({
 // =====================================================
 
 export const uploadKyc = multer({
+
     storage,
+
     fileFilter,
+
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB
+
+        fileSize: 5 * 1024 * 1024,
+
         files: 3,
+
     },
+
 }).fields([
+
     {
+
         name: "aadhaarFront",
+
         maxCount: 1,
+
     },
+
     {
+
         name: "aadhaarBack",
+
         maxCount: 1,
+
     },
+
     {
+
         name: "panImage",
+
         maxCount: 1,
+
     },
+
 ]);
 
 export const uploadIPO = multer({
+
     storage,
+
     fileFilter,
+
     limits: {
+
         fileSize: 5 * 1024 * 1024,
+
         files: 1,
+
     },
+
 }).single("logo");
 
 export const uploadBlockTrade = multer({
+
     storage,
+
     fileFilter,
+
     limits: {
+
         fileSize: 5 * 1024 * 1024,
+
         files: 1,
+
     },
+
 }).single("blockTradeLogo");
 
 // =====================================================
@@ -192,30 +209,46 @@ export const handleUploadError = (
         switch (err.code) {
 
             case "LIMIT_FILE_SIZE":
+
                 return res.status(400).json({
+
                     success: false,
+
                     message:
                         "Each image must be smaller than 5MB.",
+
                 });
 
             case "LIMIT_FILE_COUNT":
+
                 return res.status(400).json({
+
                     success: false,
+
                     message:
                         "Maximum 3 files are allowed.",
+
                 });
 
             case "LIMIT_UNEXPECTED_FILE":
+
                 return res.status(400).json({
+
                     success: false,
+
                     message:
                         "Unexpected file received.",
+
                 });
 
             default:
+
                 return res.status(400).json({
+
                     success: false,
+
                     message: err.message,
+
                 });
 
         }
@@ -223,8 +256,13 @@ export const handleUploadError = (
     }
 
     return res.status(400).json({
+
         success: false,
-        message: err.message || "File upload failed.",
+
+        message:
+            err.message ||
+            "File upload failed.",
+
     });
 
 };

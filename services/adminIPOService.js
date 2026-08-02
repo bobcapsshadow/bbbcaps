@@ -15,8 +15,8 @@ export async function createIPO(data, file) {
         symbol: data.symbol || "",
 
         logo: file
-            ? `/uploads/ipo/${file.filename}`
-            : "",
+        ? file.path
+        : "",
 
         overallSubscription: data.overallSubscription,
 

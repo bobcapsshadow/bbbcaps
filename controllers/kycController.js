@@ -1,4 +1,4 @@
-import fs from "fs";
+import cloudinary from "../config/cloudinary.js";
 
 import {
     submitKyc,
@@ -14,24 +14,27 @@ import {
 // Delete Uploaded Files (Rollback)
 // ======================================================
 
-const deleteUploadedFiles = (files) => {
+const deleteUploadedFiles = async (files) => {
 
     if (!files) return;
 
-    Object.values(files).forEach((fileArray) => {
+    for (const fileArray of Object.values(files)) {
 
-        fileArray.forEach((file) => {
+        for (const file of fileArray) {
 
             try {
 
-                if (
-                    file?.path &&
-                    fs.existsSync(file.path)
-                ) {
+                if (!file?.path) continue;
 
-                    fs.unlinkSync(file.path);
+                const match = file.path.match(
+                    /\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/
+                );
 
-                }
+                if (!match) continue;
+
+                await cloudinary.uploader.destroy(
+                    match[1]
+                );
 
             } catch (error) {
 
@@ -42,9 +45,9 @@ const deleteUploadedFiles = (files) => {
 
             }
 
-        });
+        }
 
-    });
+    }
 
 };
 
@@ -71,7 +74,7 @@ export const submitKycController = async (
     } catch (error) {
 
         // Rollback uploaded images
-        deleteUploadedFiles(req.files);
+        await deleteUploadedFiles(req.files);
 
         return res.status(400).json({
 

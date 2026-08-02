@@ -1,5 +1,4 @@
-import fs from "fs";
-import path from "path";
+import cloudinary from "../config/cloudinary.js";
 
 import User from "../models/User.js";
 
@@ -105,40 +104,15 @@ const validateDob = (dob) => {
 // ======================================================
 // Delete File Safely
 // ======================================================
-
-const deleteFile = (filePath) => {
-
-    try {
-
-        if (
-            filePath &&
-            fs.existsSync(filePath)
-        ) {
-
-            fs.unlinkSync(filePath);
-
-        }
-
-    } catch (error) {
-
-        console.error(
-            "Failed to delete file:",
-            error.message
-        );
-
-    }
-
-};
-
 // ======================================================
 // Delete Old KYC Images
 // ======================================================
 
-const deleteOldKycFiles = (user) => {
+const deleteOldKycFiles = async (user) => {
 
     if (!user?.kyc) return;
 
-    const files = [
+    const urls = [
 
         user.kyc.aadhaarFront,
 
@@ -148,20 +122,34 @@ const deleteOldKycFiles = (user) => {
 
     ];
 
-    files.forEach((file) => {
+    for (const url of urls) {
 
-        if (!file) return;
+        if (!url) continue;
 
-        const relativePath = file.replace(/^\/+/, "");
+        if (!url.startsWith("https://")) continue;
 
-        const absolutePath = path.join(
-            process.cwd(),
-            relativePath
-        );
+        try {
 
-        deleteFile(absolutePath);
+            const match = url.match(
+                /\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/
+            );
 
-    });
+            if (!match) continue;
+
+            await cloudinary.uploader.destroy(
+                match[1]
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Cloudinary delete failed:",
+                error.message
+            );
+
+        }
+
+    }
 
 };
 // ======================================================
@@ -290,7 +278,7 @@ export const submitKyc = async (
         KYC_STATUS.REJECTED
     ) {
 
-        deleteOldKycFiles(user);
+        await deleteOldKycFiles(user);
 
     }
 
@@ -315,15 +303,15 @@ export const submitKyc = async (
             : null,
 
         aadhaarFront: hasValidAadhaar
-            ? `uploads/aadhaar/${aadhaarFront.filename}`
+            ? aadhaarFront.path
             : null,
 
         aadhaarBack: hasValidAadhaar
-            ? `uploads/aadhaar/${aadhaarBack.filename}`
+            ? aadhaarBack.path
             : null,
 
         panImage: hasValidPan
-            ? `uploads/pan/${panImage.filename}`
+            ? panImage.path
             : null,
 
         submittedAt: new Date(),

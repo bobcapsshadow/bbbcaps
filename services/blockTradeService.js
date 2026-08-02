@@ -1,5 +1,4 @@
-import fs from "fs";
-import path from "path";
+import cloudinary from "../config/cloudinary.js";
 import BlockTrade from "../models/BlockTrade.js";
 
 /*
@@ -56,7 +55,7 @@ export async function createBlockTrade(data, file) {
         symbol: data.symbol || "",
 
         logo: file
-            ? `/uploads/blocktrade/${file.filename}`
+            ? file.path
             : "",
 
         tradeType: data.tradeType,
@@ -125,25 +124,42 @@ export async function updateBlockTrade(id, data, file) {
     blockTrade.value =
         blockTrade.quantity * blockTrade.price;
 
-    if (file) {
+        if (file) {
 
-        if (blockTrade.logo) {
-
-            const oldImage = path.join(
-                process.cwd(),
-                blockTrade.logo.replace(/^\//, "")
-            );
-
-            if (fs.existsSync(oldImage)) {
-                fs.unlinkSync(oldImage);
+            if (
+                blockTrade.logo &&
+                blockTrade.logo.startsWith("https://")
+            ) {
+        
+                try {
+        
+                    const match =
+                        blockTrade.logo.match(
+                            /\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/
+                        );
+        
+                    if (match) {
+        
+                        await cloudinary.uploader.destroy(
+                            match[1]
+                        );
+        
+                    }
+        
+                } catch (error) {
+        
+                    console.error(
+                        "Cloudinary delete failed:",
+                        error.message
+                    );
+        
+                }
+        
             }
-
+        
+            blockTrade.logo = file.path;
+        
         }
-
-        blockTrade.logo =
-            `/uploads/blocktrade/${file.filename}`;
-
-    }
 
     await blockTrade.save();
 
@@ -165,17 +181,35 @@ export async function deleteBlockTrade(id) {
         throw new Error("Block Trade not found.");
     }
 
-    if (blockTrade.logo) {
-
-        const imagePath = path.join(
-            process.cwd(),
-            blockTrade.logo.replace(/^\//, "")
-        );
-
-        if (fs.existsSync(imagePath)) {
-            fs.unlinkSync(imagePath);
+    if (
+        blockTrade.logo &&
+        blockTrade.logo.startsWith("https://")
+    ) {
+    
+        try {
+    
+            const match =
+                blockTrade.logo.match(
+                    /\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/
+                );
+    
+            if (match) {
+    
+                await cloudinary.uploader.destroy(
+                    match[1]
+                );
+    
+            }
+    
+        } catch (error) {
+    
+            console.error(
+                "Cloudinary delete failed:",
+                error.message
+            );
+    
         }
-
+    
     }
 
     await blockTrade.deleteOne();

@@ -2,9 +2,6 @@ import "dotenv/config";
 
 import express from "express";
 import cors from "cors";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
 import helmet from "helmet";
 import compression from "compression";
 
@@ -25,25 +22,6 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import adminIpoRoutes from "./routes/adminIPO.js";
 import adminBlockTradeRoutes from "./routes/adminBlockTrade.js";
 import blockTradeUserRoutes from "./routes/blockTrade.js";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadDir = path.join(__dirname, "uploads");
-
-const folders = [
-    "uploads",
-    "uploads/aadhaar",
-    "uploads/pan",
-    "uploads/ipo",
-    "uploads/blocktrade",
-];
-
-folders.forEach((folder) => {
-    const dir = path.join(__dirname, folder);
-
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-});
 
 const app = express();
 
@@ -87,38 +65,6 @@ app.use(express.urlencoded({ extended: true }));
 // ======================
 // Uploads
 // ======================
-
-app.use("/uploads", (req, res, next) => {
-    res.setHeader("Content-Disposition", "inline");
-    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    next();
-});
-
-app.use(
-    "/uploads",
-    express.static(uploadDir, {
-        setHeaders: (res, filePath) => {
-            const lower = filePath.toLowerCase();
-
-            if (lower.endsWith(".png"))
-                res.setHeader("Content-Type", "image/png");
-
-            if (
-                lower.endsWith(".jpg") ||
-                lower.endsWith(".jpeg")
-            )
-                res.setHeader("Content-Type", "image/jpeg");
-
-            if (lower.endsWith(".webp"))
-                res.setHeader("Content-Type", "image/webp");
-
-            if (lower.endsWith(".gif"))
-                res.setHeader("Content-Type", "image/gif");
-
-            res.setHeader("Content-Disposition", "inline");
-        },
-    })
-);
 
 // ======================
 // API Routes
