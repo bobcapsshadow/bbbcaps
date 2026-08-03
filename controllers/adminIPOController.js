@@ -1,5 +1,6 @@
 import {
     createIPO,
+    updateIPO,
     updateUserIPO,
     deleteIPO,
     closeIPO,
@@ -107,6 +108,32 @@ export async function close(req, res) {
         res.json({
             success: true,
             message: "IPO Closed Successfully.",
+            ipo,
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            success: false,
+            message: error.message,
+        });
+
+    }
+
+}
+export async function update(req, res) {
+
+    try {
+
+        const ipo = await updateIPO(
+            req.params.id,
+            req.body,
+            req.file
+        );
+
+        res.json({
+            success: true,
+            message: "IPO Updated Successfully.",
             ipo,
         });
 

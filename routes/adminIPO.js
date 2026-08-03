@@ -7,6 +7,7 @@ import {
 
 import {
     create,
+    update,
     updateUser,
     remove,
     close,
@@ -33,6 +34,13 @@ router.put("/update-user", updateUser);
 
 // Close IPO
 router.put("/close/:id", close);
+
+router.put(
+    "/:id",
+    uploadIPO,
+    handleUploadError,
+    update
+);
 
 // Delete IPO
 router.delete("/:id", remove);

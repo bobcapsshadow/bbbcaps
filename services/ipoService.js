@@ -7,9 +7,8 @@ import UserIPO from "../models/UserIPO.js";
 |--------------------------------------------------------------------------
 */
 export async function getOpenIPOs(username) {
-    const ipos = await IPO.find({
-        status: "OPEN",
-    }).sort({ createdAt: -1 });
+    const ipos = await IPO.find({})
+    .sort({ createdAt: -1 });
 
     const subscribed = await UserIPO.find({
         username: username.toLowerCase(),
@@ -99,6 +98,8 @@ export async function getSubscribedIPOs(username) {
             symbol: record.ipoId.symbol,
 
             logo: record.ipoId.logo,
+
+            status: record.ipoId.status,
 
             overallSubscription: record.ipoId.overallSubscription,
 

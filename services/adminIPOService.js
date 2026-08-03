@@ -151,3 +151,63 @@ export async function closeIPO(id) {
     );
 
 }
+/*
+|--------------------------------------------------------------------------
+| Update IPO
+|--------------------------------------------------------------------------
+*/
+
+export async function updateIPO(id, data, file) {
+
+    const ipo = await IPO.findById(id);
+
+    if (!ipo) {
+        throw new Error("IPO not found.");
+    }
+
+    ipo.companyName = data.companyName;
+    ipo.symbol = data.symbol || "";
+    ipo.overallSubscription = data.overallSubscription;
+    ipo.openDate = data.openDate;
+    ipo.closeDate = data.closeDate;
+
+    if (data.status) {
+
+        ipo.status = String(data.status)
+            .trim()
+            .toUpperCase();
+    
+    }
+
+    if (file) {
+
+        if (
+            ipo.logo &&
+            ipo.logo.startsWith("https://")
+        ) {
+
+            try {
+
+                const match = ipo.logo.match(
+                    /\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/
+                );
+
+                if (match) {
+                    await cloudinary.uploader.destroy(match[1]);
+                }
+
+            } catch (err) {
+                console.error(err);
+            }
+
+        }
+
+        ipo.logo = file.path;
+
+    }
+
+    await ipo.save();
+
+    return ipo;
+
+}
