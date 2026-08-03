@@ -14,6 +14,10 @@ const allowedMimeTypes = [
     "image/jpg",
     "image/png",
     "image/webp",
+    "image/heic",
+    "image/heif",
+    "image/pjpeg",
+    "image/x-png",
 ];
 
 const allowedExtensions = [
@@ -21,6 +25,8 @@ const allowedExtensions = [
     ".jpeg",
     ".png",
     ".webp",
+    ".heic",
+    ".heif",
 ];
 
 // =====================================================
@@ -39,16 +45,16 @@ const fileFilter = (req, file, cb) => {
     const validExtension =
         allowedExtensions.includes(extension);
 
-    if (!validMime || !validExtension) {
+        if (!validMime && !validExtension) {
 
-        return cb(
-            new Error(
-                "Only JPG, JPEG, PNG and WEBP images are allowed."
-            ),
-            false
-        );
-
-    }
+            return cb(
+                new Error(
+                    "Only image files are allowed."
+                ),
+                false
+            );
+        
+        }
 
     cb(null, true);
 
@@ -123,7 +129,7 @@ export const uploadKyc = multer({
 
     limits: {
 
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 10 * 1024 * 1024,
 
         files: 3,
 
@@ -165,7 +171,7 @@ export const uploadIPO = multer({
 
     limits: {
 
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 10 * 1024 * 1024,
 
         files: 1,
 
@@ -181,7 +187,7 @@ export const uploadBlockTrade = multer({
 
     limits: {
 
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 10 * 1024 * 1024,
 
         files: 1,
 
@@ -215,7 +221,7 @@ export const handleUploadError = (
                     success: false,
 
                     message:
-                        "Each image must be smaller than 5MB.",
+                        "Each image must be smaller than 10MB.",
 
                 });
 
