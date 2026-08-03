@@ -35,9 +35,6 @@ const allowedExtensions = [
 
 const fileFilter = (req, file, cb) => {
 
-    console.log("Original Name:", file.originalname);
-    console.log("Mime Type:", file.mimetype);
-
     cb(null, true);
 
 };
