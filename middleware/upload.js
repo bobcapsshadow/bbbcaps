@@ -35,26 +35,8 @@ const allowedExtensions = [
 
 const fileFilter = (req, file, cb) => {
 
-    const extension = path
-        .extname(file.originalname)
-        .toLowerCase();
-
-    const validMime =
-        allowedMimeTypes.includes(file.mimetype);
-
-    const validExtension =
-        allowedExtensions.includes(extension);
-
-        if (!validMime && !validExtension) {
-
-            return cb(
-                new Error(
-                    "Only image files are allowed."
-                ),
-                false
-            );
-        
-        }
+    console.log("Original Name:", file.originalname);
+    console.log("Mime Type:", file.mimetype);
 
     cb(null, true);
 
