@@ -37,6 +37,13 @@ const orderSchema = new mongoose.Schema(
             trim: true,
         },
 
+        blockTradeId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "BlockTrade",
+            default: null,
+            index: true,
+        },
+
         type: {
             type: String,
             enum: ["BUY", "SELL"],

@@ -5,6 +5,8 @@ import {
     create,
     update,
     remove,
+    getSellRequests,
+    deleteSellRequest,
 } from "../controllers/adminBlockTradeController.js";
 
 import {
@@ -20,19 +22,67 @@ const router = express.Router();
 |--------------------------------------------------------------------------
 */
 
+/*
+|--------------------------------------------------------------------------
+| Get All Block Trades
+|--------------------------------------------------------------------------
+*/
+
 router.get(
     "/all",
     getAll
 );
 
+/*
+|--------------------------------------------------------------------------
+| Get Block Sell Requests
+|--------------------------------------------------------------------------
+|
+| Admin panel ke liye pending SELL requests.
+|
+*/
 
-// Create Block Trade
+router.get(
+    "/sell-requests",
+    getSellRequests
+);
+
+/*
+|--------------------------------------------------------------------------
+| Delete Block Sell Request
+|--------------------------------------------------------------------------
+|
+| Admin delete par:
+| - Sell request remove
+| - Related Position remove
+| - Related Block Trade Order(s) remove
+| - Block Trade remove
+|
+*/
+
+router.delete(
+    "/sell-requests/:requestId",
+    deleteSellRequest
+);
+
+/*
+|--------------------------------------------------------------------------
+| Create Block Trade
+|--------------------------------------------------------------------------
+*/
+
 router.post(
     "/create",
     uploadBlockTrade,
     handleUploadError,
     create
 );
+
+/*
+|--------------------------------------------------------------------------
+| Update Block Trade
+|--------------------------------------------------------------------------
+*/
 
 router.put(
     "/:id",
@@ -41,7 +91,12 @@ router.put(
     update
 );
 
-// Delete Block Trade
+/*
+|--------------------------------------------------------------------------
+| Delete Block Trade
+|--------------------------------------------------------------------------
+*/
+
 router.delete(
     "/:id",
     remove

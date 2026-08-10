@@ -62,6 +62,12 @@ const positionSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        
+        userInvestedAmount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
 
         currentPrice: {
             type: Number,
@@ -89,17 +95,55 @@ const positionSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+
+        /*
+        |--------------------------------------------------------------------------
+        | Block Trade Reference
+        |--------------------------------------------------------------------------
+        |
+        | Normal position:
+        | blockTradeId = null
+        |
+        | Block Trade position:
+        | blockTradeId = related BlockTrade document ID
+        |
+        | Isse same user + same symbol ki normal aur Block Trade
+        | positions ko alag identify kiya ja sakta hai.
+        |
+        */
+        blockTradeId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "BlockTrade",
+            default: null,
+            index: true,
+        },
     },
     {
         timestamps: true,
     }
 );
 
-// Ek user ke liye ek symbol sirf ek hi position hogi
+/*
+|--------------------------------------------------------------------------
+| Position Uniqueness
+|--------------------------------------------------------------------------
+|
+| Normal position:
+| userId + symbol + blockTradeId(null)
+|
+| Block Trade position:
+| userId + symbol + blockTradeId(BlockTrade ID)
+|
+| Isse same user ke same symbol ki normal position aur
+| Block Trade position alag documents ho sakti hain.
+|
+*/
+
 positionSchema.index(
     {
         userId: 1,
         symbol: 1,
+        blockTradeId: 1,
     },
     {
         unique: true,
