@@ -234,22 +234,34 @@ function updatePosition(
             ).toFixed(2)
         );
 
+    // IMPORTANT:
+    // investedAmount is the ACTUAL discounted cash paid at BUY time.
+    // It must NOT be used as the P&L cost basis.
+    // P&L is calculated against the REAL market BUY price in averagePrice.
+    const realCostBasis =
+        Number(
+            (
+                position.averagePrice *
+                position.quantity
+            ).toFixed(2)
+        );
+
     position.profitLoss =
         Number(
             (
                 position.currentValue -
-                position.investedAmount
+                realCostBasis
             ).toFixed(2)
         );
 
     position.profitLossPercent =
-        position.investedAmount === 0
+        realCostBasis === 0
             ? 0
             : Number(
                   (
                       (
                           position.profitLoss /
-                          position.investedAmount
+                          realCostBasis
                       ) *
                       100
                   ).toFixed(2)
@@ -322,10 +334,62 @@ export async function buyStock(
     |--------------------------------------------------------------------------
     */
 
-    const totalAmount =
+    /*
+    |--------------------------------------------------------------------------
+    | Calculate User Discounted Buy Amount
+    |--------------------------------------------------------------------------
+    |
+    | Admin can set one discount percentage on a user.
+    | That discount applies to ALL normal stocks purchased
+    | by that user.
+    |
+    | Example:
+    | Stock price = ₹1,000
+    | Discount    = 10%
+    | Buy price   = ₹900
+    |
+    | IMPORTANT:
+    | The discount is calculated on the backend using the
+    | user's saved discountPercent. The frontend price is
+    | never trusted for the purchase calculation.
+    |
+    */
+
+    const discountPercent =
+        Number(
+            user.discountPercent || 0
+        );
+
+    if (
+        !Number.isFinite(discountPercent) ||
+        discountPercent < 0 ||
+        discountPercent > 100
+    ) {
+        throw new Error(
+            "Invalid user discount percentage."
+        );
+    }
+
+    const discountAmount =
         Number(
             (
                 stock.price *
+                (discountPercent / 100)
+            ).toFixed(2)
+        );
+
+    const discountedPrice =
+        Number(
+            (
+                stock.price -
+                discountAmount
+            ).toFixed(2)
+        );
+
+    const totalAmount =
+        Number(
+            (
+                discountedPrice *
                 quantity
             ).toFixed(2)
         );
@@ -435,13 +499,29 @@ export async function buyStock(
             position.quantity +
             quantity;
 
+        // P&L cost basis uses REAL market BUY prices.
+        // totalAmount remains the discounted amount actually paid.
+        const existingRealCostBasis =
+            Number(position.averagePrice || 0) *
+            Number(position.quantity || 0);
+
+        const newRealCostBasis =
+            Number(stock.price || 0) *
+            Number(quantity || 0);
+
+        const updatedRealCostBasis =
+            existingRealCostBasis +
+            newRealCostBasis;
+
+        const updatedAveragePrice =
+            updatedQuantity === 0
+                ? 0
+                : updatedRealCostBasis /
+                  updatedQuantity;
+
         const updatedInvestment =
             position.investedAmount +
             totalAmount;
-
-        const updatedAveragePrice =
-            updatedInvestment /
-            updatedQuantity;
 
         position.quantity =
             updatedQuantity;
@@ -453,6 +533,7 @@ export async function buyStock(
                 )
             );
 
+        // Actual discounted cash paid remains the accounting amount.
         position.investedAmount =
             Number(
                 updatedInvestment.toFixed(
@@ -518,12 +599,12 @@ export async function buyStock(
         quantity,
 
         price:
-            stock.price,
+            discountedPrice,
 
         totalAmount,
 
         averageBuyPrice:
-            stock.price,
+            discountedPrice,
 
         realizedProfit:
             0,
@@ -566,8 +647,15 @@ export async function buyStock(
 
             quantity,
 
-            price:
+            originalPrice:
                 stock.price,
+
+            discountPercent,
+
+            discountAmount,
+
+            price:
+                discountedPrice,
 
             totalAmount,
 
@@ -790,12 +878,26 @@ export async function sellStock(
         position.quantity =
             remainingQuantity;
 
+        // Preserve the proportional ACTUAL discounted cash paid
+        // for the shares that remain after a partial SELL.
+        const originalQuantity =
+            Number(position.quantity || 0);
+
+        const originalInvestedAmount =
+            Number(position.investedAmount || 0);
+
+        const remainingInvestedAmount =
+            originalQuantity > 0
+                ? (
+                      originalInvestedAmount *
+                      remainingQuantity
+                  ) /
+                  originalQuantity
+                : 0;
+
         position.investedAmount =
             Number(
-                (
-                    position.averagePrice *
-                    remainingQuantity
-                ).toFixed(2)
+                remainingInvestedAmount.toFixed(2)
             );
 
         updatePosition(

@@ -23,6 +23,7 @@ import {
     addBalanceController,
     deductBalanceController,
     updateCreditScoreController,
+    updateUserDiscountController,
 } from "../controllers/adminController.js";
 
 import {
@@ -165,6 +166,28 @@ router.patch(
 );
 
 // ======================================================
+// Update User Discount
+// ======================================================
+//
+// Body:
+//
+// {
+//     "username": "yusuf",
+//     "discountPercent": 10
+// }
+//
+// 10% discount will apply to all stocks
+// purchased by this user.
+//
+
+router.patch(
+    "/discount",
+    protect,
+    // adminProtect,
+    updateUserDiscountController
+);
+
+// ======================================================
 // Send Notification
 // ======================================================
 
@@ -179,4 +202,5 @@ router.post(
     sendNotificationController
 
 );
+
 export default router;

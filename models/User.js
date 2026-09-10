@@ -55,7 +55,7 @@ const userSchema = new mongoose.Schema(
             enum: ["user", "admin"],
             default: "user",
         },
-        
+
         isKycVerified: {
             type: Boolean,
             default: false,
@@ -64,6 +64,15 @@ const userSchema = new mongoose.Schema(
         isEmailVerified: {
             type: Boolean,
             default: false,
+        },
+
+        // Discount applied to all stocks for this user.
+        // Example: 10 means 10% discount.
+        discountPercent: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 100,
         },
 
         kyc: {
@@ -78,57 +87,57 @@ const userSchema = new mongoose.Schema(
                 ],
                 default: "not_started",
             },
-        
+
             fullName: {
                 type: String,
                 default: "",
             },
-        
+
             dob: {
                 type: Date,
                 default: null,
             },
-        
+
             aadhaarNumber: {
                 type: String,
                 default: "",
             },
-        
+
             panNumber: {
                 type: String,
                 default: "",
             },
-        
+
             aadhaarFront: {
                 type: String,
                 default: "",
             },
-        
+
             aadhaarBack: {
                 type: String,
                 default: "",
             },
-        
+
             panImage: {
                 type: String,
                 default: "",
             },
-        
+
             submittedAt: {
                 type: Date,
                 default: null,
             },
-        
+
             approvedAt: {
                 type: Date,
                 default: null,
             },
-        
+
             rejectedReason: {
                 type: String,
                 default: "",
             },
-        
+
         },
 
         bankDetails: {
@@ -138,36 +147,36 @@ const userSchema = new mongoose.Schema(
                 default: "",
                 trim: true,
             },
-        
+
             holderName: {
                 type: String,
                 default: "",
                 trim: true,
             },
-        
+
             accountNumber: {
                 type: String,
                 default: "",
                 trim: true,
             },
-        
+
             ifsc: {
                 type: String,
                 default: "",
                 trim: true,
                 uppercase: true,
             },
-        
+
             isAdded: {
                 type: Boolean,
                 default: false,
             },
-        
+
             addedAt: {
                 type: Date,
                 default: null,
             },
-        
+
         },
 
         lastLogin: {

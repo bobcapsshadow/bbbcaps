@@ -44,7 +44,9 @@ router.post("/buy", buy);
 */
 
 router.post("/sell", sell);
+
 router.get("/position/:symbol", position);
+
 router.get("/positions", positions);
 
 export default router;

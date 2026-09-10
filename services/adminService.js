@@ -116,6 +116,7 @@ export const deductBalance = async ({
     };
 
 };
+
 /*
 =========================================
 UPDATE CREDIT SCORE
@@ -159,6 +160,80 @@ export const updateCreditScore = async ({
         message: "Credit score updated successfully.",
 
         creditScore: user.creditScore,
+
+    };
+
+};
+
+/*
+=========================================
+UPDATE USER DISCOUNT
+=========================================
+
+Admin username aur discount percentage
+dalega.
+
+Example:
+
+username: "yusuf"
+discountPercent: 10
+
+Is user ke saare stocks ke liye
+10% discount save hoga.
+
+0% set karne par discount remove
+ho jayega.
+=========================================
+*/
+
+export const updateUserDiscount = async ({
+    username,
+    discountPercent,
+}) => {
+
+    if (!username || !String(username).trim()) {
+        throw new Error("Username is required.");
+    }
+
+    if (
+        discountPercent === undefined ||
+        discountPercent === null ||
+        discountPercent === ""
+    ) {
+        throw new Error("Discount percentage is required.");
+    }
+
+    const discount = Number(discountPercent);
+
+    if (Number.isNaN(discount)) {
+        throw new Error("Invalid discount percentage.");
+    }
+
+    if (discount < 0 || discount > 100) {
+        throw new Error(
+            "Discount percentage must be between 0 and 100."
+        );
+    }
+
+    const user = await User.findOne({
+        username: String(username).trim().toLowerCase(),
+    });
+
+    if (!user) {
+        throw new Error("User not found.");
+    }
+
+    user.discountPercent = discount;
+
+    await user.save();
+
+    return {
+
+        message: "User discount updated successfully.",
+
+        username: user.username,
+
+        discountPercent: user.discountPercent,
 
     };
 
