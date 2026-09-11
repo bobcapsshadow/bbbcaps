@@ -5,48 +5,26 @@ import {
     sell,
     position,
     positions,
+    createMarketTradeRequest,
+    sellMarket,
+    marketRequests,
+    marketPositions,
+    marketRequest,
 } from "../controllers/tradeController.js";
 
 const router = express.Router();
 
-/*
-|--------------------------------------------------------------------------
-| BUY STOCK
-|--------------------------------------------------------------------------
-|
-| POST /api/trade/buy
-|
-| Body:
-| {
-|   "username": "yusuf",
-|   "symbol": "RELIANCE.NS",
-|   "quantity": 5
-| }
-|
-*/
-
 router.post("/buy", buy);
-
-/*
-|--------------------------------------------------------------------------
-| SELL STOCK
-|--------------------------------------------------------------------------
-|
-| POST /api/trade/sell
-|
-| Body:
-| {
-|   "username": "yusuf",
-|   "symbol": "RELIANCE.NS",
-|   "quantity": 2
-| }
-|
-*/
-
 router.post("/sell", sell);
 
 router.get("/position/:symbol", position);
-
 router.get("/positions", positions);
+
+router.post("/market-request", createMarketTradeRequest);
+router.post("/market-request/:requestId/sell", sellMarket);
+
+router.get("/market-requests", marketRequests);
+router.get("/market-positions", marketPositions);
+router.get("/market-request/:requestId", marketRequest);
 
 export default router;

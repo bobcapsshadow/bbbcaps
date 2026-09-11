@@ -23,6 +23,13 @@ import adminIpoRoutes from "./routes/adminIPO.js";
 import adminBlockTradeRoutes from "./routes/adminBlockTrade.js";
 import blockTradeUserRoutes from "./routes/blockTrade.js";
 
+
+
+import {
+    startMarketTradeScheduler,
+} from "./jobs/marketTradeScheduler.js";
+
+
 const app = express();
 
 // ======================
@@ -61,7 +68,10 @@ app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
 
+// ======================
 // Uploads
+// ======================
+
 // ======================
 // Uploads
 // ======================
@@ -133,6 +143,7 @@ app.get("/", (req, res) => {
 
 });
 
+
 // ======================
 // 404 Handler
 // ======================
@@ -148,6 +159,7 @@ app.use((req, res) => {
     });
 
 });
+
 
 // ======================
 // Global Error Handler
@@ -167,6 +179,9 @@ app.use((err, req, res, next) => {
 
 });
 
+
+
+
 // ======================
 // Server
 // ======================
@@ -176,12 +191,35 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
 
     console.log("");
+
     console.log("====================================");
+
     console.log("🚀 BobStock Backend Started");
+
     console.log(`🌐 http://localhost:${PORT}`);
+
     console.log(`🛢️ MongoDB : Connected`);
-    console.log(`🌍 Environment : ${process.env.NODE_ENV || "development"}`);
+
+    console.log(
+        `🌍 Environment : ${process.env.NODE_ENV || "development"}`
+    );
+
     console.log("====================================");
+
+    console.log("");
+
+
+    // Start the automatic pending order execution scheduler
+
+
+    // Start Admin-controlled Market trade scheduler
+
+    startMarketTradeScheduler();
+
+    console.log(
+        "📊 Admin-controlled Market trade scheduler started"
+    );
+
     console.log("");
 
 });

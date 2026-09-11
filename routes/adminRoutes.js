@@ -1,5 +1,8 @@
 import express from "express";
 
+import MarketRequest from "../models/MarketRequest.js";
+import Position from "../models/Position.js";
+
 import { protect } from "../middleware/auth.js";
 // Future:
 // import { adminProtect } from "../middleware/adminMiddleware.js";
@@ -29,6 +32,12 @@ import {
 import {
     sendNotificationController,
 } from "../controllers/notificationController.js";
+
+import {
+    getAdminMarketRequests,
+    setMarketResult,
+    updateMarketResult,
+} from "../services/marketTradeService.js";
 
 const router = express.Router();
 
@@ -202,5 +211,335 @@ router.post(
     sendNotificationController
 
 );
+
+// ======================================================
+// ADMIN MARKET TRADING
+// ======================================================
+//
+// USER FLOW:
+//
+// stockdetails.tsx
+//       |
+//       | BUY
+//       v
+// POST /trade/market-request
+//       |
+//       v
+// MarketRequest = PENDING
+//       |
+//       v
+// GET /admin/market
+//       |
+//       v
+// ADMIN SEES REQUEST
+//       |
+//       v
+// duration + percentage
+//       |
+//       v
+// PATCH /admin/market/:id/set
+//       |
+//       v
+// PENDING -> ACTIVE
+//       |
+//       v
+// Position created
+//       |
+//       v
+// P&L starts
+//
+// IMPORTANT:
+//
+// Market requests are separate from the normal /orders
+// pending LIMIT system.
+//
+// Therefore a Market request will NOT appear in the user's
+// normal Pending Orders tab just because its status is
+// PENDING.
+//
+// ======================================================
+
+
+// ======================================================
+// GET ADMIN MARKET REQUESTS
+// ======================================================
+//
+// GET /api/admin/market
+//
+// Default:
+//
+// PENDING
+// ACTIVE
+// LOCKED
+//
+// Optional:
+//
+// GET /api/admin/market?status=PENDING
+//
+// GET /api/admin/market?status=ACTIVE
+//
+// GET /api/admin/market?status=LOCKED
+//
+// Completed:
+//
+// CLOSED
+// SETTLED
+//
+// are not returned by default.
+//
+// So when a Market trade is sold or expires, it disappears
+// from the active Admin Market section.
+//
+// ======================================================
+
+router.get(
+    "/market",
+    protect,
+    // adminProtect,
+    async (req, res) => {
+        try {
+
+            /*
+            |--------------------------------------------------------------------------
+            | JWT PAYLOAD
+            |--------------------------------------------------------------------------
+            |
+            | Your jwt.js stores:
+            |
+            | {
+            |     id: userId
+            | }
+            |
+            | auth.js puts decoded JWT into:
+            |
+            | req.user
+            |
+            | Therefore the correct ID is:
+            |
+            | req.user.id
+            |
+            |--------------------------------------------------------------------------
+            */
+
+            const adminId =
+                req.user?.id;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Optional Status
+            |--------------------------------------------------------------------------
+            */
+
+            const status =
+                req.query?.status;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Get Market Requests
+            |--------------------------------------------------------------------------
+            */
+
+            const result =
+                await getAdminMarketRequests({
+                    adminId,
+                    status,
+                });
+
+
+            return res.json(
+                result
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Get Admin Market requests error:",
+                error
+            );
+
+
+            return res.status(400).json({
+                success: false,
+
+                message:
+                    error.message ||
+                    "Unable to get Market requests.",
+            });
+        }
+    }
+);
+
+
+// ======================================================
+// SET MARKET RESULT
+// ======================================================
+//
+// PATCH /api/admin/market/:id/set
+//
+// Admin sends:
+//
+// {
+//     "durationMinutes": 15,
+//     "percent": 0.30
+// }
+//
+// OR:
+//
+// {
+//     "durationMinutes": 15,
+//     "percent": "+0.30"
+// }
+//
+// OR negative:
+//
+// {
+//     "durationMinutes": 15,
+//     "percent": "-0.50"
+// }
+//
+// Examples:
+//
+// +0.30
+// -0.50
+// +5
+// -10
+//
+// The Market service accepts the +/- percentage.
+//
+// Once SET is pressed:
+//
+// PENDING
+//     |
+//     v
+// ACTIVE
+//
+// Position is created.
+//
+// P&L starts running.
+//
+// ======================================================
+
+router.patch(
+    "/market/:id/set",
+    protect,
+    // adminProtect,
+    async (req, res) => {
+
+        try {
+
+            const {
+                durationMinutes,
+                percent,
+            } = req.body || {};
+
+            const adminId =
+                req.user?.id;
+
+            /*
+             * Check current Market request status.
+             */
+            const request =
+                await MarketRequest.findById(
+                    req.params.id
+                );
+
+            if (!request) {
+                throw new Error(
+                    "Market request not found."
+                );
+            }
+
+            let result;
+
+            /*
+             * NEW REQUEST
+             *
+             * PENDING -> ACTIVE
+             *
+             * Position will be created.
+             */
+            if (
+                request.status ===
+                "PENDING"
+            ) {
+
+                result =
+                    await setMarketResult({
+                        requestId:
+                            req.params.id,
+
+                        adminId,
+
+                        durationMinutes,
+
+                        percent,
+                    });
+
+            }
+
+            /*
+             * EXISTING TRADE
+             *
+             * ACTIVE / LOCKED -> EDIT
+             *
+             * Existing Position will be updated.
+             */
+            else if (
+                request.status ===
+                "ACTIVE" ||
+                request.status ===
+                "LOCKED"
+            ) {
+
+                result =
+                    await updateMarketResult({
+                        requestId:
+                            req.params.id,
+
+                        adminId,
+
+                        durationMinutes,
+
+                        percent,
+                    });
+
+            }
+
+            /*
+             * SETTLED / CLOSED
+             * cannot be edited.
+             */
+            else {
+
+                throw new Error(
+                    `Market request cannot be modified from status ${request.status}.`
+                );
+
+            }
+
+            return res.json(
+                result
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Set Admin Market result error:",
+                error
+            );
+
+            return res.status(400).json({
+                success: false,
+
+                message:
+                    error.message ||
+                    "Unable to set Market result.",
+            });
+        }
+    }
+);
+
 
 export default router;
