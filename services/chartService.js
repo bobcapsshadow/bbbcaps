@@ -25,6 +25,7 @@ export async function getChart(symbol, selectedRange = "1d") {
 
   let data = null;
   let lastError = null;
+  let actualRange = selectedRange;
 
   for (const yahooSymbol of symbolsToTry) {
     try {
@@ -38,13 +39,62 @@ export async function getChart(symbol, selectedRange = "1d") {
         }
       );
 
-      if (!response.data.chart?.error) {
+      const result = response.data?.chart?.result?.[0];
+      const quote = result?.indicators?.quote?.[0];
+
+      if (
+        !response.data?.chart?.error &&
+        result &&
+        Array.isArray(result.timestamp) &&
+        result.timestamp.length > 0 &&
+        quote &&
+        Array.isArray(quote.close) &&
+        quote.close.some((value) => value !== null && value !== undefined)
+      ) {
         data = response.data;
         break;
       }
-
     } catch (err) {
       lastError = err;
+    }
+  }
+
+  // If 1D/5m data is unavailable, automatically fall back to 5D/15m.
+  // All other requested ranges keep their original behavior.
+  if (!data && selectedRange === "1d") {
+    const fallbackConfig = RANGE_CONFIG["5d"];
+
+    for (const yahooSymbol of symbolsToTry) {
+      try {
+        const response = await axios.get(
+          `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=${fallbackConfig.range}&interval=${fallbackConfig.interval}`,
+          {
+            headers: {
+              "User-Agent": "Mozilla/5.0",
+            },
+            timeout: 10000,
+          }
+        );
+
+        const result = response.data?.chart?.result?.[0];
+        const quote = result?.indicators?.quote?.[0];
+
+        if (
+          !response.data?.chart?.error &&
+          result &&
+          Array.isArray(result.timestamp) &&
+          result.timestamp.length > 0 &&
+          quote &&
+          Array.isArray(quote.close) &&
+          quote.close.some((value) => value !== null && value !== undefined)
+        ) {
+          data = response.data;
+          actualRange = "5d";
+          break;
+        }
+      } catch (err) {
+        lastError = err;
+      }
     }
   }
 
@@ -91,7 +141,7 @@ export async function getChart(symbol, selectedRange = "1d") {
       meta.shortName ||
       meta.symbol,
 
-    range: selectedRange,
+    range: actualRange,
 
     exchange:
       meta.fullExchangeName ||
