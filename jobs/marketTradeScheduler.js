@@ -120,6 +120,13 @@ async function processMarketTrades() {
 
     try {
 
+        // IMPORTANT:
+        // Do NOT pause or skip processing when the exchange is closed.
+        // The service is responsible for the authoritative market-status check,
+        // P&L freeze/resume behaviour, and wall-clock expiry settlement.
+        // Keeping the dispatcher active every second ensures a trade that
+        // expires while the market is closed is settled on time using the
+        // frozen P&L instead of waiting for the market to reopen.
         await processAllMarketRequests();
 
     } catch (error) {

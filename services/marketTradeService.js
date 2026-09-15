@@ -680,6 +680,42 @@ function validateLiveMarket(
 
 /*
 |--------------------------------------------------------------------------
+| MARKET OPEN/CLOSED STATE FOR P&L
+|--------------------------------------------------------------------------
+|
+| This is separate from validateLiveMarket(). SKIP_MARKET_CHECK may bypass
+| entry validation, but it must never make the P&L engine ignore a closed
+| market. The duration clock remains tied to expiresAt.
+|--------------------------------------------------------------------------
+*/
+
+function isMarketOpenForPnl(market, assetType, now = new Date()) {
+    const resolvedAssetType = String(assetType || "STOCK").trim().toUpperCase();
+
+    if (resolvedAssetType === "CRYPTO") return true;
+
+    if (market?.marketState) {
+        const state = String(market.marketState).toUpperCase();
+        if (state === "CLOSED") return false;
+        if (state === "REGULAR" || state === "OPEN") return true;
+    }
+
+    const current = new Date(now);
+    const indiaTime = new Date(current.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const day = indiaTime.getDay();
+    if (day === 0 || day === 6) return false;
+
+    if (resolvedAssetType === "STOCK") {
+        const currentMinutes = indiaTime.getHours() * 60 + indiaTime.getMinutes();
+        return currentMinutes >= 9 * 60 + 15 && currentMinutes <= 15 * 60 + 30;
+    }
+
+    return true;
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | Financial Calculation
 |--------------------------------------------------------------------------
 */
@@ -963,6 +999,19 @@ function calculateProgressPercent(
 
     const nowTime =
         new Date(now).getTime();
+
+    /* A persisted closed-market checkpoint is authoritative until reopen. */
+    if (
+        !marketRequest.settled &&
+        marketRequest.closedAt &&
+        marketRequest.closedPercent !== null &&
+        marketRequest.closedPercent !== undefined
+    ) {
+        return roundNumber(
+            Number(marketRequest.closedPercent),
+            8
+        );
+    }
 
     const duration =
         expiresAt - startedAt;
@@ -2073,161 +2122,156 @@ export async function getMarketRequest(
 export async function refreshMarketRequest(
     request
 ) {
-    if (!request) {
-        return null;
-    }
+    if (!request) return null;
 
-    if (
-        request.status !==
-        "ACTIVE" &&
-        request.status !==
-        "LOCKED"
-    ) {
+    if (request.status !== "ACTIVE" && request.status !== "LOCKED") {
         return request;
     }
 
-    const now =
-        new Date();
-
-    /*
-    |--------------------------------------------------------------------------
-    | 5-second final lock
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        request.expiresAt &&
-        request.adminPercent !==
-        null
-    ) {
-        const expiresAt =
-            new Date(
-                request.expiresAt
-            ).getTime();
-
-        const remaining =
-            expiresAt -
-            now.getTime();
-
-        if (
-            remaining <=
-            MARKET_FINAL_LOCK_SECONDS *
-            1000
-        ) {
-            request.finalPercent =
-                Number(
-                    request.adminPercent
-                );
-
-            request.lockedAt =
-                request.lockedAt ||
-                now;
-
-            request.status =
-                "LOCKED";
-        }
-    }
-
-    const currentPercent =
-        calculateProgressPercent(
-            request,
-            now
-        );
-
-    const currentPnl =
-        calculatePnlFromPercent(
-            request.margin,
-            currentPercent
-        );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Refresh market price
-    |--------------------------------------------------------------------------
-    */
+    const now = new Date();
+    let market = null;
 
     try {
-        /*
-        | PERFORMANCE FIX:
-        |
-        | Uses the shared cache/in-flight-dedup wrapper instead of
-        | calling fetchStock() directly, so multiple MarketRequests on
-        | the same symbol (or overlapping scheduler ticks) do not each
-        | trigger their own external market-price request.
-        */
-        const market =
-            await getCachedMarketPrice(
-                request.symbol
-            );
-
-        if (
-            market &&
-            Number(market.price) >
-            0
-        ) {
-            request.currentPrice =
-                Number(
-                    market.price
-                );
+        market = await getCachedMarketPrice(request.symbol);
+        if (market && Number(market.price) > 0) {
+            request.currentPrice = Number(market.price);
         }
     } catch (error) {
-        /*
-        | Do not kill the controlled P&L engine merely because a live
-        | market-price refresh failed.
-        */
         console.error(
             `Failed to refresh Market price for ${request.symbol}:`,
             error
         );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Update connected Position
-    |--------------------------------------------------------------------------
-    */
+    const marketOpen = isMarketOpenForPnl(
+        market,
+        request.assetType,
+        now
+    );
 
-    if (request.positionId) {
-        const position =
-            await Position.findById(
-                request.positionId
+    const expiresAt = request.expiresAt
+        ? new Date(request.expiresAt).getTime()
+        : null;
+
+    const expired =
+        expiresAt !== null &&
+        now.getTime() >= expiresAt;
+
+    /*
+    | CLOSED MARKET: freeze the exact P&L reached at the first closed tick.
+    | The duration clock is untouched, so expiry can still occur normally.
+    */
+    if (!marketOpen) {
+        let frozenPercent;
+
+        if (
+            request.closedAt &&
+            request.closedPercent !== null &&
+            request.closedPercent !== undefined
+        ) {
+            frozenPercent = Number(request.closedPercent);
+        } else {
+            const snapshot =
+                typeof request.toObject === "function"
+                    ? request.toObject()
+                    : { ...request };
+
+            snapshot.closedAt = null;
+            snapshot.closedPercent = null;
+            snapshot.closedPnl = null;
+
+            frozenPercent = calculateProgressPercent(
+                snapshot,
+                now
             );
 
+            request.closedPercent = roundNumber(frozenPercent, 8);
+            request.closedPnl = calculatePnlFromPercent(
+                request.margin,
+                frozenPercent
+            );
+            request.closedAt = now;
+        }
+
+        const frozenPnl = calculatePnlFromPercent(
+            request.margin,
+            frozenPercent
+        );
+
+        request.closedPercent = roundNumber(frozenPercent, 8);
+        request.closedPnl = frozenPnl;
+
+        /* If duration expires while closed, the frozen value is final. */
+        if (expired) {
+            request.finalPercent = request.closedPercent;
+            request.lockedAt = request.lockedAt || now;
+            request.status = "LOCKED";
+        }
+
+        if (request.positionId) {
+            const position = await Position.findById(request.positionId);
+            if (position) {
+                position.currentPrice = request.currentPrice || request.entryPrice;
+                position.profitLoss = frozenPnl;
+                position.profitLossPercent = frozenPercent;
+                position.unrealizedPnl = frozenPnl;
+                position.unrealizedPnlPercent = frozenPercent;
+                position.adminPercent = request.adminPercent;
+                position.marketFinalPercent = request.finalPercent;
+                position.marketLockedAt = request.lockedAt;
+                position.lastPriceUpdated = now;
+                await position.save();
+            }
+        }
+
+        await request.save();
+        return request;
+    }
+
+    /*
+    | MARKET OPEN: clear only the temporary freeze checkpoint. The original
+    | startedAt/expiresAt are untouched, so the duration never gets extended.
+    */
+    if (request.closedAt) {
+        request.closedAt = null;
+        request.closedPercent = null;
+        request.closedPnl = null;
+    }
+
+    /* Final 5-second lock applies only while the market is open. */
+    if (
+        request.expiresAt &&
+        request.adminPercent !== null &&
+        !expired
+    ) {
+        const remaining = expiresAt - now.getTime();
+        if (remaining <= MARKET_FINAL_LOCK_SECONDS * 1000) {
+            request.finalPercent = Number(request.adminPercent);
+            request.lockedAt = request.lockedAt || now;
+            request.status = "LOCKED";
+        }
+    }
+
+    const currentPercent = calculateProgressPercent(request, now);
+    const currentPnl = calculatePnlFromPercent(request.margin, currentPercent);
+
+    if (request.positionId) {
+        const position = await Position.findById(request.positionId);
         if (position) {
-            position.currentPrice =
-                request.currentPrice ||
-                request.entryPrice;
-
-            position.profitLoss =
-                currentPnl;
-
-            position.profitLossPercent =
-                currentPercent;
-
-            position.unrealizedPnl =
-                currentPnl;
-
-            position.unrealizedPnlPercent =
-                currentPercent;
-
-            position.adminPercent =
-                request.adminPercent;
-
-            position.marketFinalPercent =
-                request.finalPercent;
-
-            position.marketLockedAt =
-                request.lockedAt;
-
-            position.lastPriceUpdated =
-                now;
-
+            position.currentPrice = request.currentPrice || request.entryPrice;
+            position.profitLoss = currentPnl;
+            position.profitLossPercent = currentPercent;
+            position.unrealizedPnl = currentPnl;
+            position.unrealizedPnlPercent = currentPercent;
+            position.adminPercent = request.adminPercent;
+            position.marketFinalPercent = request.finalPercent;
+            position.marketLockedAt = request.lockedAt;
+            position.lastPriceUpdated = now;
             await position.save();
         }
     }
 
     await request.save();
-
     return request;
 }
 
@@ -3651,19 +3695,51 @@ export async function sellMarketPosition(
     |--------------------------------------------------------------------------
     | Determine current/final percentage
     |--------------------------------------------------------------------------
+    |
+    | Protect against a user pressing SELL during a market closure before
+    | the next scheduler tick has written the freeze checkpoint.
     */
 
-    const closingPercent =
-        request.status ===
-            "LOCKED"
-            ? Number(
-                request.finalPercent ??
-                request.adminPercent ??
-                0
-            )
-            : calculateProgressPercent(
-                request
+    if (!request.closedAt) {
+        try {
+            const market = await getCachedMarketPrice(request.symbol);
+            const marketOpen = isMarketOpenForPnl(
+                market,
+                request.assetType
             );
+
+            if (!marketOpen) {
+                const frozenPercent = calculateProgressPercent(request);
+                request.closedPercent = roundNumber(frozenPercent, 8);
+                request.closedPnl = calculatePnlFromPercent(
+                    request.margin,
+                    frozenPercent
+                );
+                request.closedAt = new Date();
+                await request.save();
+            }
+        } catch (error) {
+            /* Keep the existing SELL behavior if market-state lookup fails. */
+        }
+    }
+
+    let closingPercent;
+
+    if (
+        request.closedAt &&
+        request.closedPercent !== null &&
+        request.closedPercent !== undefined
+    ) {
+        closingPercent = Number(request.closedPercent);
+    } else if (request.status === "LOCKED") {
+        closingPercent = Number(
+            request.finalPercent ??
+            request.adminPercent ??
+            0
+        );
+    } else {
+        closingPercent = calculateProgressPercent(request);
+    }
 
     const closingPnl =
         calculatePnlFromPercent(
@@ -4016,24 +4092,31 @@ export async function processMarketRequest(
         /*
         | EXPIRY REACHED — WAIT FOR USER SELL
         |
-        | The duration has ended, but Market trades must NOT
-        | automatically settle. The final P&L is frozen and the
-        | request remains visible until the user explicitly presses SELL.
+        | First refresh once so a market closure is honored. If the market
+        | is closed, refreshMarketRequest() stores the last live P&L and
+        | locks that exact frozen value. If the market is open, the existing
+        | Admin final percentage remains the expiry result.
         |
         | - No automatic SELL
         | - No automatic balance adjustment
         | - Position remains OPEN
         | - Request remains LOCKED
-        | - Frozen final P&L remains visible
+        | - Frozen/final P&L remains visible
         | - User SELL performs the actual settlement/close
         */
 
-        if (
-            request.status ===
-            "ACTIVE"
-        ) {
-            await lockFinalPercent(
+        if (request.status === "ACTIVE") {
+            await refreshMarketRequest(request);
+        }
+
+        const refreshed =
+            await MarketRequest.findById(
                 request._id
+            );
+
+        if (refreshed && refreshed.status === "ACTIVE") {
+            await lockFinalPercent(
+                refreshed._id
             );
         }
 
@@ -4057,6 +4140,11 @@ export async function processMarketRequest(
     |--------------------------------------------------------------------------
     | Final 5 seconds
     |--------------------------------------------------------------------------
+    |
+    | Refresh first so a closed market never receives the Admin target.
+    | When the market is open, refreshMarketRequest() performs the normal
+    | Admin final lock. When closed, it keeps the request ACTIVE and freezes
+    | the current P&L until expiry/reopen.
     */
 
     if (
@@ -4064,25 +4152,27 @@ export async function processMarketRequest(
         MARKET_FINAL_LOCK_SECONDS *
         1000
     ) {
-        if (
-            request.status ===
-            "ACTIVE"
-        ) {
-            await lockFinalPercent(
+        if (request.status === "ACTIVE") {
+            await refreshMarketRequest(request);
+        }
+
+        const refreshed =
+            await MarketRequest.findById(
                 request._id
             );
-        }
 
         return {
             success: true,
             processed: true,
-            locked: true,
-            remainingMs:
-                remaining,
-            request:
-                await MarketRequest.findById(
-                    request._id
-                ),
+            locked: Boolean(
+                refreshed?.status === "LOCKED"
+            ),
+            marketClosed: Boolean(
+                refreshed?.closedAt &&
+                !refreshed?.settled
+            ),
+            remainingMs: remaining,
+            request: refreshed,
         };
     }
 
